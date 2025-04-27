@@ -5,8 +5,10 @@ from PyQt5.QtWidgets import (
     QComboBox, QInputDialog
 )
 from PyQt5.QtGui import QPixmap, QPainter, QColor
+from PyQt5.QtCore import Qt
 from scheduler import fcfs, sjf_non_preemptive, priority_non_preemptive, round_robin
 from process import Process
+from scheduler import fcfs, sjf_non_preemptive, priority_non_preemptive, round_robin, mlfq
 
 
 class MainWindow(QMainWindow):
@@ -59,6 +61,10 @@ class MainWindow(QMainWindow):
         self.start_button = QPushButton("Start Simulation")  # <-- THIS BUTTON
         self.start_button.clicked.connect(self.start_simulation) 
 
+        self.theme_button = QPushButton("Toggle Dark/Light Mode")
+        self.theme_button.clicked.connect(self.toggle_theme)
+        
+        button_layout.addWidget(self.theme_button)
         button_layout.addWidget(self.add_button)
         button_layout.addWidget(self.delete_button)
         button_layout.addWidget(self.start_button)
@@ -117,8 +123,8 @@ class MainWindow(QMainWindow):
                 return
             scheduled_processes = round_robin(process_list, time_quantum)
         elif selected_algorithm == "Multilevel Feedback Queue":
-            QMessageBox.information(self, "Info", "MLFQ not implemented yet.")
-            return
+            scheduled_processes = mlfq(process_list)
+
         else:
             QMessageBox.warning(self, "Warning", "Unknown Algorithm Selected!")
             return
@@ -129,6 +135,7 @@ class MainWindow(QMainWindow):
             print(f"PID: {p.pid}, Start: {p.start_time}, Finish: {p.finish_time}, Waiting: {p.waiting_time}, Turnaround: {p.turnaround_time}")
         
         self.draw_gantt_chart(scheduled_processes)
+        self.show_performance_metrics(scheduled_processes)
 
         # For now just print to console
         print("\nProcesses Loaded:")
@@ -139,44 +146,54 @@ class MainWindow(QMainWindow):
         if not process_list:
             return
 
-        # Create a blank image
         width_per_unit = 30  # Pixels per unit time
-        height = 100
+        chart_height = 100
+        label_height = 30
         total_time = process_list[-1].finish_time
         width = max(600, total_time * width_per_unit)
 
-        pixmap = QPixmap(width, height)
-        pixmap.fill(QColor('white'))
+        pixmap = QPixmap(width, chart_height + label_height)
+        pixmap.fill(QColor('#f0f0f0'))  # Light background
 
         painter = QPainter(pixmap)
+        font = painter.font()
+        font.setPointSize(10)
+        font.setBold(True)
+        painter.setFont(font)
 
-        colors = [QColor('skyblue'), QColor('lightgreen'), QColor('lightcoral'),
-                QColor('plum'), QColor('khaki'), QColor('orange'), QColor('cyan')]
+        # Colors (improved modern colors)
+        colors = [QColor('#3498db'), QColor('#2ecc71'), QColor('#e74c3c'),
+                QColor('#9b59b6'), QColor('#f1c40f'), QColor('#e67e22'), QColor('#1abc9c')]
 
         x = 0
 
         for i, process in enumerate(process_list):
             process_width = (process.finish_time - process.start_time) * width_per_unit
 
-            # Draw process block
+            # Draw block with rounded rectangle
             painter.setBrush(colors[i % len(colors)])
-            painter.drawRect(x, 0, process_width, height)
+            painter.setPen(QColor('#2c3e50'))  # Dark border
+            painter.drawRoundedRect(x + 2, 2, process_width - 4, chart_height - 4, 10, 10)
 
-            # Draw process ID
-            painter.drawText(x + process_width // 2 - 10, height // 2, f"P{process.pid}")
+            # Center the Process ID in the middle
+            text = f"P{process.pid}"
+            text_rect = painter.boundingRect(x, 0, process_width, chart_height, 0, text)
+            painter.drawText(text_rect, Qt.AlignCenter, text)
 
-            # Draw start time
-            painter.drawText(x, height - 10, str(process.start_time))
+            # Draw start time at the bottom
+            start_time_text = str(process.start_time)
+            painter.drawText(x, chart_height + 20, start_time_text)
 
             x += process_width
 
-        # Draw the final finish time
-        painter.drawText(x, height - 10, str(process_list[-1].finish_time))
+        # Draw final finish time
+        painter.drawText(x, chart_height + 20, str(process_list[-1].finish_time))
 
         painter.end()
 
-        # Set to label
+        # Set pixmap to label
         self.gantt_chart_label.setPixmap(pixmap)
+
 
     def get_time_quantum(self):
         text, ok = QInputDialog.getText(self, 'Time Quantum', 'Enter Time Quantum:')
@@ -191,3 +208,43 @@ class MainWindow(QMainWindow):
                 return None, False
         return None, False
 
+    def show_performance_metrics(self, scheduled_processes):
+        if not scheduled_processes:
+            return
+
+        total_waiting_time = sum(p.waiting_time for p in scheduled_processes)
+        total_turnaround_time = sum(p.turnaround_time for p in scheduled_processes)
+        total_burst_time = sum(p.burst_time for p in scheduled_processes)
+        total_processes = len(scheduled_processes)
+        total_time_span = scheduled_processes[-1].finish_time - min(p.arrival_time for p in scheduled_processes)
+
+        average_waiting_time = total_waiting_time / total_processes
+        average_turnaround_time = total_turnaround_time / total_processes
+        cpu_utilization = (total_burst_time / total_time_span) * 100
+        throughput = total_processes / total_time_span
+
+        report = f"""
+
+            Performance Metrics:
+            ---------------------
+
+Average Waiting Time: {average_waiting_time:.2f} units
+Average Turnaround Time: {average_turnaround_time:.2f} units
+CPU Utilization: {cpu_utilization:.2f} %
+Throughput: {throughput:.2f} processes/unit time
+Completion Order: {', '.join('P'+str(p.pid) for p in scheduled_processes)}
+        """
+
+        QMessageBox.information(self, "Performance Metrics", report)
+
+    def toggle_theme(self):
+        current_style = self.parent().styleSheet() if self.parent() else self.styleSheet()
+
+        if "#ecf0f1" in current_style:
+            # Switch to dark mode
+            with open("styles_dark.qss", "r") as f:
+                self.parent().setStyleSheet(f.read()) if self.parent() else self.setStyleSheet(f.read())
+        else:
+            # Switch to light mode
+            with open("styles.qss", "r") as f:
+                self.parent().setStyleSheet(f.read()) if self.parent() else self.setStyleSheet(f.read())

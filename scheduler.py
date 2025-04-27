@@ -127,3 +127,61 @@ def round_robin(process_list, time_quantum):
                 current_time = processes[0].arrival_time
 
     return completed
+
+
+def mlfq(process_list, q1=4, q2=8):
+    process_list.sort(key=lambda x: x.arrival_time)
+
+    completed = []
+    queue1 = []
+    queue2 = []
+    queue3 = []
+
+    current_time = 0
+    processes = process_list.copy()
+
+    while processes or queue1 or queue2 or queue3:
+        # Move newly arrived processes to queue1
+        while processes and processes[0].arrival_time <= current_time:
+            queue1.append(processes.pop(0))
+
+        if queue1:
+            current_process = queue1.pop(0)
+            execute_time = min(q1, current_process.remaining_time)
+        elif queue2:
+            current_process = queue2.pop(0)
+            execute_time = min(q2, current_process.remaining_time)
+        elif queue3:
+            current_process = queue3.pop(0)
+            execute_time = current_process.remaining_time  # FCFS no quantum
+        else:
+            if processes:
+                current_time = processes[0].arrival_time
+            continue
+
+        if current_process.start_time is None:
+            current_process.start_time = current_time
+            current_process.response_time = current_time - current_process.arrival_time
+
+        current_time += execute_time
+        current_process.remaining_time -= execute_time
+
+        # Move new arrivals during execution
+        while processes and processes[0].arrival_time <= current_time:
+            queue1.append(processes.pop(0))
+
+        if current_process.remaining_time == 0:
+            current_process.finish_time = current_time
+            current_process.turnaround_time = current_process.finish_time - current_process.arrival_time
+            current_process.waiting_time = current_process.turnaround_time - current_process.burst_time
+            completed.append(current_process)
+        else:
+            # Move to lower queue
+            if current_process in queue1:
+                queue2.append(current_process)
+            elif current_process in queue2:
+                queue3.append(current_process)
+            else:
+                queue3.append(current_process)
+
+    return completed

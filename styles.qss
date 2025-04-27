@@ -1,0 +1,51 @@
+/* Whole App Background */
+QWidget {
+    background-color: #ecf0f1;
+    font-family: 'Segoe UI', 'Arial';
+    font-size: 14px;
+}
+
+/* Main Buttons */
+QPushButton {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+}
+
+QPushButton:hover {
+    background-color: #2980b9;
+}
+
+QPushButton:disabled {
+    background-color: #bdc3c7;
+}
+
+/* Table Widget */
+QTableWidget {
+    background-color: white;
+    border: 1px solid #bdc3c7;
+    border-radius: 6px;
+    gridline-color: #95a5a6;
+}
+
+QHeaderView::section {
+    background-color: #34495e;
+    color: white;
+    padding: 5px;
+    border: none;
+}
+
+/* ComboBox (Dropdown) */
+QComboBox {
+    background-color: white;
+    border: 1px solid #3498db;
+    border-radius: 6px;
+    padding: 5px;
+}
+
+/* Labels (like Gantt chart label) */
+QLabel {
+    font-weight: bold;
+}
