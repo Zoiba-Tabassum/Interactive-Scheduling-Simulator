@@ -109,6 +109,8 @@ class MainWindow(QMainWindow):
             process = Process(pid, arrival_time, burst_time, priority)
             process_list.append(process)
 
+        self.suggest_algorithm(process_list)
+
         selected_algorithm = self.algorithm_combo.currentText()
 
         if selected_algorithm == "First-Come-First-Served (FCFS)":
@@ -248,3 +250,24 @@ Completion Order: {', '.join('P'+str(p.pid) for p in scheduled_processes)}
             # Switch to light mode
             with open("styles.qss", "r") as f:
                 self.parent().setStyleSheet(f.read()) if self.parent() else self.setStyleSheet(f.read())
+
+    def suggest_algorithm(self, process_list):
+        short_tasks = sum(1 for p in process_list if p.burst_time <= 3)
+        long_wait_expected = any(p.priority > 5 for p in process_list)
+        mixed_tasks = any(p.burst_time >= 8 for p in process_list) and any(p.burst_time <= 3 for p in process_list)
+
+        suggestion = "Suggestion:\n"
+
+        if short_tasks >= len(process_list) // 2:
+            suggestion += "- Many short tasks detected. Recommended: SJF (Shortest Job First)\n"
+
+        if long_wait_expected:
+            suggestion += "- Interactive tasks with long wait times detected. Recommended: Priority Scheduling\n"
+
+        if mixed_tasks:
+            suggestion += "- Mixture of I/O-bound and CPU-bound tasks detected. Recommended: Multilevel Feedback Queue (MLFQ)\n"
+
+        if suggestion.strip() != "Suggestion:":
+            QMessageBox.information(self, "Algorithm Suggestion", suggestion)
+        else:
+            QMessageBox.information(self, "Algorithm Suggestion", "No specific suggestion. Default algorithms can be used.")
