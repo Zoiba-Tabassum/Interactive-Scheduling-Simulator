@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QComboBox, QInputDialog
 )
 from PyQt5.QtGui import QPixmap, QPainter, QColor
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from scheduler import fcfs, sjf_non_preemptive, priority_non_preemptive, round_robin
 from process import Process
 from scheduler import fcfs, sjf_non_preemptive, priority_non_preemptive, round_robin, mlfq
@@ -14,6 +14,12 @@ from scheduler import fcfs, sjf_non_preemptive, priority_non_preemptive, round_r
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        self.timer = None
+        self.is_paused = False
+        self.scheduled_processes = []
+        self.current_index = 0
+        self.elapsed_time = 0
 
         self.setWindowTitle("Interactive Scheduling Simulator")
         self.setGeometry(100, 100, 1000, 600)  # x, y, width, height
@@ -63,6 +69,23 @@ class MainWindow(QMainWindow):
 
         self.theme_button = QPushButton("Toggle Dark/Light Mode")
         self.theme_button.clicked.connect(self.toggle_theme)
+
+        self.pause_button = QPushButton("Pause Simulation")
+        self.pause_button.clicked.connect(self.pause_simulation)
+        self.pause_button.setEnabled(False)
+
+        self.resume_button = QPushButton("Resume Simulation")
+        self.resume_button.clicked.connect(self.resume_simulation)
+        self.resume_button.setEnabled(False)
+
+        self.reset_button = QPushButton("Reset Simulation")
+        self.reset_button.clicked.connect(self.reset_simulation)
+        self.reset_button.setEnabled(False)
+
+        button_layout.addWidget(self.pause_button)
+        button_layout.addWidget(self.resume_button)
+        button_layout.addWidget(self.reset_button)
+
         
         button_layout.addWidget(self.theme_button)
         button_layout.addWidget(self.add_button)
@@ -137,6 +160,20 @@ class MainWindow(QMainWindow):
             print(f"PID: {p.pid}, Start: {p.start_time}, Finish: {p.finish_time}, Waiting: {p.waiting_time}, Turnaround: {p.turnaround_time}")
         
         self.draw_gantt_chart(scheduled_processes)
+       
+        # Prepare for Simulation Control
+        self.scheduled_processes = scheduled_processes
+        self.current_index = 0
+        self.elapsed_time = 0
+
+        self.pause_button.setEnabled(True)
+        self.resume_button.setEnabled(False)
+        self.reset_button.setEnabled(True)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.run_simulation_step)
+        self.timer.start(500)  # 0.5 second = one time unit
+
         self.show_performance_metrics(scheduled_processes)
 
         # For now just print to console
@@ -271,3 +308,48 @@ Completion Order: {', '.join('P'+str(p.pid) for p in scheduled_processes)}
             QMessageBox.information(self, "Algorithm Suggestion", suggestion)
         else:
             QMessageBox.information(self, "Algorithm Suggestion", "No specific suggestion. Default algorithms can be used.")
+
+    def run_simulation_step(self):
+        if self.is_paused or self.current_index >= len(self.scheduled_processes):
+            if self.current_index >= len(self.scheduled_processes):
+                self.timer.stop()
+                self.pause_button.setEnabled(False)
+                self.resume_button.setEnabled(False)
+            return
+
+        process = self.scheduled_processes[self.current_index]
+
+        if self.elapsed_time >= process.start_time and self.elapsed_time < process.finish_time:
+            self.elapsed_time += 1
+            # Update Gantt chart dynamically (Optional if you implemented dynamic drawing)
+        else:
+            self.current_index += 1
+
+    def pause_simulation(self):
+        if self.timer:
+            self.is_paused = True
+            self.pause_button.setEnabled(False)
+            self.resume_button.setEnabled(True)
+
+    def resume_simulation(self):
+        if self.timer:
+            self.is_paused = False
+            self.pause_button.setEnabled(True)
+            self.resume_button.setEnabled(False)
+
+    def reset_simulation(self):
+        if self.timer:
+            self.timer.stop()
+
+        self.is_paused = False
+        self.scheduled_processes = []
+        self.current_index = 0
+        self.elapsed_time = 0
+
+        self.pause_button.setEnabled(False)
+        self.resume_button.setEnabled(False)
+        self.reset_button.setEnabled(False)
+
+        # Optionally clear Gantt chart
+        self.gantt_chart_label.clear()
+        
